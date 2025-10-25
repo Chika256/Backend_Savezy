@@ -25,6 +25,12 @@ class User(db.Model):
         cascade="all, delete-orphan",
         lazy="dynamic",
     )
+    cards = db.relationship(
+        "Card",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
 
     def to_dict(self):
         """Serialize the user for JSON responses."""
@@ -38,12 +44,79 @@ class User(db.Model):
         return f"<User id={self.id} email={self.email!r}>"
 
 
+class Card(db.Model):
+    """Spending card used when logging expenses."""
+
+    __tablename__ = "cards"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = db.Column(db.String(100), nullable=False)
+    brand = db.Column(db.String(50))
+    last_four = db.Column(db.String(4))
+
+    user = db.relationship("User", back_populates="cards")
+    expenses = db.relationship(
+        "Expense",
+        back_populates="card",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+
+    def to_dict(self):
+        """Serialize the card for JSON responses."""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "name": self.name,
+            "brand": self.brand,
+            "last_four": self.last_four,
+        }
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Card id={self.id} name={self.name!r}>"
+
+
+class Category(db.Model):
+    """Expense category definitions with unique slug identifiers."""
+
+    __tablename__ = "categories"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    slug = db.Column(db.String(50), nullable=False, unique=True)
+    description = db.Column(db.String(255))
+
+    expenses = db.relationship(
+        "Expense",
+        back_populates="category",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+
+    def to_dict(self):
+        """Serialize the category for JSON responses."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "description": self.description,
+        }
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<Category id={self.id} slug={self.slug!r}>"
+
+
 class Expense(db.Model):
     """Expense entry tracked per user."""
 
     __tablename__ = "expenses"
     __table_args__ = (
-        db.Index("ix_expenses_user_category", "user_id", "category"),
+        db.Index("ix_expenses_user_category", "user_id", "category_id"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -52,26 +125,45 @@ class Expense(db.Model):
         db.ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
+    category_id = db.Column(
+        db.Integer,
+        db.ForeignKey("categories.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    card_id = db.Column(
+        db.Integer,
+        db.ForeignKey("cards.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     title = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Float, nullable=False)
-    category = db.Column(db.String(50), nullable=False)
     date = db.Column(db.DateTime, default=utc_now, nullable=False)
     description = db.Column(db.String(255))
 
     user = db.relationship("User", back_populates="expenses")
+    category = db.relationship("Category", back_populates="expenses")
+    card = db.relationship("Card", back_populates="expenses")
 
     def to_dict(self):
         """Serialize the expense for JSON responses."""
-        return {
+        serialized = {
             "id": self.id,
             "user_id": self.user_id,
             "title": self.title,
             "amount": self.amount,
-            "category": self.category,
             "date": self.date.isoformat() if self.date else None,
             "description": self.description,
         }
+        if self.category:
+            serialized["category"] = self.category.slug
+            serialized["category_name"] = self.category.name
+        else:
+            serialized["category"] = None
+        if self.card:
+            serialized["card"] = self.card.to_dict()
+        else:
+            serialized["card"] = None
+        return serialized
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<Expense id={self.id} title={self.title!r} amount={self.amount}>"
-

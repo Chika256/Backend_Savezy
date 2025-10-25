@@ -15,20 +15,25 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
 - **Body:**
   - `title` *(string, required)*
   - `amount` *(number, required)*
-  - `category` *(string, required)*
+  - `category` *(string, required; enum: `investment`, `wants`, `need`)*
+  - `card_id` *(integer, required; references saved card)*
   - `description` *(string, optional)*
   - `date` *(ISO 8601 datetime, optional)*
 - **Response:** `201` with `{ "message": "Expense created successfully.", "data": { "expense": {...} } }`
+  - `expense.category` is the stored slug; `expense.category_name` is the human-readable name.
+  - `expense.card` contains the linked card object with `id`, `name`, `brand`, and `last_four`.
 
 ### List Expenses
 - **Method/Path:** `GET /api/expenses`
 - **Query Params:**
   - `page` *(int, default 1)*
   - `limit` *(int, default 10, max 100)*
-  - `category` *(string, optional)*
+  - `category` *(string, optional; enum: `investment`, `wants`, `need`)*
   - `sort` *(string, one of: `date`, `amount`, `title`, `category`; default `date`)*
   - `order` *(string, `asc` or `desc`; default `desc`)*
 - **Response:** `200` with paginated items in `data.items`.
+  - Each item includes both `category` (slug) and `category_name`.
+  - Each item includes the nested `card` object.
 
 ### Retrieve Expense
 - **Method/Path:** `GET /api/expenses/<id>`
