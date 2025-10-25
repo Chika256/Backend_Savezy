@@ -7,12 +7,8 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
-from app.utils.jwt_helper import token_required
-<<<<<<< Updated upstream
-from app.models import Expense, User
-=======
 from app.models import Card, Category, Expense
->>>>>>> Stashed changes
+from app.utils.jwt_helper import token_required
 from app.utils.validators import validate_expense
 
 # Dedicated blueprint for expense management.
@@ -106,11 +102,7 @@ def _card_not_found_response():
 
 @expenses_bp.route("/api/expenses", methods=["POST"])
 @token_required
-<<<<<<< Updated upstream
-def create_expense(jwt_payload):
-=======
 def create_expense(user_payload):
->>>>>>> Stashed changes
     """Create a new expense scoped to the authenticated user."""
     payload = request.get_json(silent=True) or {}
 
@@ -131,11 +123,7 @@ def create_expense(user_payload):
         return _card_not_found_response()
 
     expense = Expense(
-<<<<<<< Updated upstream
-        user_id=jwt_payload['user_id'],
-=======
         user_id=user_id,
->>>>>>> Stashed changes
         title=payload.get("title"),
         amount=float(payload.get("amount")),
         category=category,
@@ -169,11 +157,7 @@ def create_expense(user_payload):
 
 @expenses_bp.route("/api/expenses", methods=["GET"])
 @token_required
-<<<<<<< Updated upstream
-def list_expenses(jwt_payload):
-=======
 def list_expenses(user_payload):
->>>>>>> Stashed changes
     """Return paginated expenses filtered and sorted for the current user."""
     page = request.args.get("page", default=1, type=int)
     limit = request.args.get("limit", default=10, type=int)
@@ -181,13 +165,14 @@ def list_expenses(user_payload):
     limit = max(1, min(limit, 100))
 
     raw_category = request.args.get("category")
-    category = None
+    category_row = None
     category_slug = None
     if raw_category:
-        category = _normalize_expense_type(raw_category)
-        if not category:
+        category_row = _normalize_expense_type(raw_category)
+        if not category_row:
             return _expense_type_error()
-        category_slug = category.slug
+        category_slug = category_row.slug
+
     sort = request.args.get("sort", default="date").lower()
     order = request.args.get("order", default="desc").lower()
 
@@ -201,27 +186,22 @@ def list_expenses(user_payload):
     sort_column = sortable_fields.get(sort, Expense.date)
     sort_order = sort_column.desc() if order == "desc" else sort_column.asc()
 
-<<<<<<< Updated upstream
-    query = Expense.query.filter_by(user_id=jwt_payload['user_id'])
-    if category:
-        query = query.filter(Expense.category == category)
-=======
     user_id = _extract_user_id(user_payload)
     if user_id is None:
         return _json_response("Authentication required.", {}, status=401)
 
     query = (
-        Expense.query.join(Category)
-        .join(Card)
+        Expense.query.outerjoin(Category)
+        .outerjoin(Card)
         .filter(Expense.user_id == user_id)
     )
-    if category_slug:
-        query = query.filter(Category.slug == category_slug)
->>>>>>> Stashed changes
 
-    query = query.order_by(sort_order)
+    if category_row:
+        query = query.filter(Expense.category == category_row)
 
-    pagination = query.paginate(page=page, per_page=limit, error_out=False)
+    pagination = query.order_by(sort_order).paginate(
+        page=page, per_page=limit, error_out=False
+    )
 
     data = {
         "items": [_serialize_expense(expense) for expense in pagination.items],
@@ -240,23 +220,13 @@ def list_expenses(user_payload):
 
 @expenses_bp.route("/api/expenses/<int:expense_id>", methods=["GET"])
 @token_required
-<<<<<<< Updated upstream
-def get_expense(jwt_payload, expense_id):
-=======
 def get_expense(user_payload, expense_id):
->>>>>>> Stashed changes
     """Return a single expense owned by the authenticated user."""
     user_id = _extract_user_id(user_payload)
     if user_id is None:
         return _json_response("Authentication required.", {}, status=401)
 
-    expense = Expense.query.filter_by(
-<<<<<<< Updated upstream
-        id=expense_id, user_id=jwt_payload['user_id']
-=======
-        id=expense_id, user_id=user_id
->>>>>>> Stashed changes
-    ).first()
+    expense = Expense.query.filter_by(id=expense_id, user_id=user_id).first()
 
     if not expense:
         return _json_response("Expense not found.", data={}, status=404)
@@ -268,23 +238,13 @@ def get_expense(user_payload, expense_id):
 
 @expenses_bp.route("/api/expenses/<int:expense_id>", methods=["PUT", "PATCH"])
 @token_required
-<<<<<<< Updated upstream
-def update_expense(jwt_payload, expense_id):
-=======
 def update_expense(user_payload, expense_id):
->>>>>>> Stashed changes
     """Update a user's expense with partial or full payloads."""
     user_id = _extract_user_id(user_payload)
     if user_id is None:
         return _json_response("Authentication required.", {}, status=401)
 
-    expense = Expense.query.filter_by(
-<<<<<<< Updated upstream
-        id=expense_id, user_id=jwt_payload['user_id']
-=======
-        id=expense_id, user_id=user_id
->>>>>>> Stashed changes
-    ).first()
+    expense = Expense.query.filter_by(id=expense_id, user_id=user_id).first()
 
     if not expense:
         return _json_response("Expense not found.", data={}, status=404)
@@ -345,23 +305,13 @@ def update_expense(user_payload, expense_id):
 
 @expenses_bp.route("/api/expenses/<int:expense_id>", methods=["DELETE"])
 @token_required
-<<<<<<< Updated upstream
-def delete_expense(jwt_payload, expense_id):
-=======
 def delete_expense(user_payload, expense_id):
->>>>>>> Stashed changes
     """Delete an expense that belongs to the authenticated user."""
     user_id = _extract_user_id(user_payload)
     if user_id is None:
         return _json_response("Authentication required.", {}, status=401)
 
-    expense = Expense.query.filter_by(
-<<<<<<< Updated upstream
-        id=expense_id, user_id=jwt_payload['user_id']
-=======
-        id=expense_id, user_id=user_id
->>>>>>> Stashed changes
-    ).first()
+    expense = Expense.query.filter_by(id=expense_id, user_id=user_id).first()
 
     if not expense:
         return _json_response("Expense not found.", data={}, status=404)
@@ -376,9 +326,9 @@ def delete_expense(user_payload, expense_id):
         )
 
     return _json_response("Expense deleted successfully.", {"expense_id": expense_id}, 200)
+
+
 # Canonical expense types.
-
-
 class ExpenseType(str, Enum):
     """Enumerated expense categories."""
 
