@@ -460,6 +460,239 @@ def token_refresh2():
         }), 200
 
     except Exception as e:
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+
+
+@auth_bp.route('/google/verify', methods=['POST'])
+@limiter.limit("10 per minute")
+def google_verify():
+    """
+    Verify Google ID token (for Flutter/Mobile direct sign-in) and return JWT
+
+    This endpoint is for mobile apps using Google Sign-In SDK directly.
+    The mobile app gets an ID token from Google and sends it here to exchange for JWT.
+
+    Request Body:
+        {
+            "id_token": "google_id_token_from_flutter"
+        }
+
+    Response:
+        {
+            "success": true,
+            "token": "your_jwt_token",
+            "user": {
+                "id": 1,
+                "email": "user@example.com",
+                "name": "John Doe",
+                "picture": "https://..."
+            }
+        }
+    """
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as google_requests
+
+        data = request.get_json()
+
+        if not data or 'id_token' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'id_token is required'
+            }), 400
+
+        # Verify Google ID token
+        try:
+            current_app.logger.info(f"Attempting to verify ID token with client ID: {os.getenv('GOOGLE_CLIENT_ID')}")
+            idinfo = id_token.verify_oauth2_token(
+                data['id_token'],
+                google_requests.Request(),
+                os.getenv('GOOGLE_CLIENT_ID')
+            )
+
+            # Extract user info from ID token
+            email = idinfo.get('email')
+            name = idinfo.get('name')
+            picture = idinfo.get('picture')
+            google_id = idinfo.get('sub')
+
+            if not email:
+                return jsonify({
+                    'success': False,
+                    'error': 'Email not found in ID token'
+                }), 400
+
+        except ValueError as e:
+            current_app.logger.error(f"ID token verification failed: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Invalid ID token: {str(e)}'
+            }), 401
+        except Exception as e:
+            current_app.logger.error(f"Unexpected error during token verification: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Token verification error: {str(e)}'
+            }), 401
+
+        # Create or update user in database
+        try:
+            user = User.query.filter_by(email=email).first()
+
+            if not user:
+                user = User(email=email, name=name)
+                db.session.add(user)
+                db.session.commit()
+            else:
+                user.name = name
+                db.session.commit()
+
+        except Exception as db_error:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': 'Database error occurred'
+            }), 500
+
+        # Generate JWT token
+        jwt_token = generate_jwt(user_id=user.id, email=user.email)
+
+        return jsonify({
+            'success': True,
+            'token': jwt_token,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'picture': picture
+            }
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error in google_verify: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error',
+            'details': str(e)
+        }), 500
+
+
+@auth_bp.route('/token/verify2', methods=['POST'])
+@limiter.limit("20 per minute")
+def token_verify2():
+    """
+    Alternative JWT token verification endpoint (simpler response format)
+
+    Request Body:
+        {
+            "token": "jwt_token"
+        }
+
+    Response:
+        {
+            "success": true,
+            "valid": true,
+            "user_id": 1,
+            "email": "user@example.com"
+        }
+    """
+    from app.utils.jwt_helper import decode_jwt
+
+    try:
+        data = request.get_json(silent=True) or {}
+
+        token = data.get('token')
+
+        if not token:
+            # Check Authorization header
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '')
+
+        if not token:
+            return jsonify({
+                'success': False,
+                'valid': False,
+                'error': 'token is required'
+            }), 400
+
+        # Verify JWT
+        payload = decode_jwt(token)
+
+        if not payload:
+            return jsonify({
+                'success': False,
+                'valid': False,
+                'error': 'Token is invalid or expired'
+            }), 401
+
+        return jsonify({
+            'success': True,
+            'valid': True,
+            'user_id': payload['user_id'],
+            'email': payload['email']
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error in token_verify: {str(e)}")
+        return jsonify({
+            'success': False,
+            'valid': False,
+            'error': 'Internal server error'
+        }), 500
+
+
+@auth_bp.route('/token/refresh2', methods=['POST'])
+@limiter.limit("10 per minute")
+def token_refresh2():
+    """
+    Alternative JWT token refresh endpoint
+
+    Request Body:
+        {
+            "token": "current_jwt_token"
+        }
+
+    Response:
+        {
+            "success": true,
+            "token": "new_jwt_token"
+        }
+    """
+    from app.utils.jwt_helper import refresh_jwt
+
+    try:
+        data = request.get_json(silent=True) or {}
+
+        token = data.get('token')
+
+        if not token:
+            # Check Authorization header
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '')
+
+        if not token:
+            return jsonify({
+                'success': False,
+                'error': 'token is required'
+            }), 400
+
+        # Refresh the token
+        new_token = refresh_jwt(token)
+
+        if not new_token:
+            return jsonify({
+                'success': False,
+                'error': 'Token is invalid and cannot be refreshed'
+            }), 401
+
+        return jsonify({
+            'success': True,
+            'token': new_token
+        }), 200
+
+    except Exception as e:
         current_app.logger.error(f"Error in token_refresh: {str(e)}")
         return jsonify({
             'success': False,
