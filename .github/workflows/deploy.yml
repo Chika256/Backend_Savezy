@@ -27,18 +27,24 @@ jobs:
           echo "$EC2_SSH_KEY" > private_key.pem
           chmod 600 private_key.pem
           
-          # Copy files to EC2
+          # Copy files to EC2 (including .env.example for reference)
           rsync -avz -e "ssh -o StrictHostKeyChecking=no -i private_key.pem" \
             --exclude '.git' \
             --exclude '__pycache__' \
             --exclude '*.pyc' \
-            --exclude '.env' \
             --exclude 'venv' \
             ./ ${EC2_USER}@${EC2_HOST}:~/savezy-backend/
           
           # Build and run on EC2
           ssh -o StrictHostKeyChecking=no -i private_key.pem ${EC2_USER}@${EC2_HOST} << 'EOF'
             cd ~/savezy-backend
+            
+            # Check if .env exists, if not create from .env.example
+            if [ ! -f .env ]; then
+              echo "Creating .env from .env.example"
+              cp .env.example .env
+              echo "WARNING: Please update .env with production values!"
+            fi
             
             # Stop and remove old container
             docker stop ${{ env.CONTAINER_NAME }} || true
@@ -47,12 +53,12 @@ jobs:
             # Build new image
             docker build -t savezy-backend:latest .
             
-            # Run new container
+            # Run new container with .env from project directory
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
               -p 3000:3000 \
-              --env-file ~/.env \
+              --env-file .env \
               savezy-backend:latest
             
             # Clean up old images
