@@ -320,6 +320,7 @@ def google_verify():
 
         # Verify Google ID token
         try:
+            current_app.logger.info(f"Attempting to verify ID token with client ID: {os.getenv('GOOGLE_CLIENT_ID')}")
             idinfo = id_token.verify_oauth2_token(
                 data['id_token'],
                 google_requests.Request(),
@@ -339,9 +340,16 @@ def google_verify():
                 }), 400
 
         except ValueError as e:
+            current_app.logger.error(f"ID token verification failed: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': f'Invalid ID token: {str(e)}'
+            }), 401
+        except Exception as e:
+            current_app.logger.error(f"Unexpected error during token verification: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Token verification error: {str(e)}'
             }), 401
 
         # Create or update user in database
