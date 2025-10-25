@@ -25,19 +25,40 @@ def upgrade():
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email')
     )
+    op.create_table('cards',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('brand', sa.String(length=50), nullable=True),
+    sa.Column('last_four', sa.String(length=4), nullable=True),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('categories',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('slug', sa.String(length=50), nullable=False),
+    sa.Column('description', sa.String(length=255), nullable=True),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('name'),
+    sa.UniqueConstraint('slug')
+    )
     op.create_table('expenses',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('title', sa.String(length=100), nullable=False),
     sa.Column('amount', sa.Float(), nullable=False),
-    sa.Column('category', sa.String(length=50), nullable=False),
+    sa.Column('category_id', sa.Integer(), nullable=False),
+    sa.Column('card_id', sa.Integer(), nullable=False),
     sa.Column('date', sa.DateTime(), nullable=False),
     sa.Column('description', sa.String(length=255), nullable=True),
+    sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['card_id'], ['cards.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('expenses', schema=None) as batch_op:
-        batch_op.create_index('ix_expenses_user_category', ['user_id', 'category'], unique=False)
+        batch_op.create_index('ix_expenses_user_category', ['user_id', 'category_id'], unique=False)
 
     # ### end Alembic commands ###
 
@@ -48,5 +69,7 @@ def downgrade():
         batch_op.drop_index('ix_expenses_user_category')
 
     op.drop_table('expenses')
+    op.drop_table('cards')
+    op.drop_table('categories')
     op.drop_table('users')
     # ### end Alembic commands ###
