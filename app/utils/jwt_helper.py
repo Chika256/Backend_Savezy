@@ -32,6 +32,19 @@ def decode_jwt(token):
         return None
 
 
+def refresh_jwt(token):
+    """Refresh an expired or expiring JWT token"""
+    try:
+        # Decode without verification to get payload even if expired
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+
+        # Generate new token with same user info
+        new_token = generate_jwt(user_id=payload['user_id'], email=payload['email'])
+        return new_token
+    except jwt.InvalidTokenError:
+        return None
+
+
 def token_required(f):
     """decorator to protect routes"""
 

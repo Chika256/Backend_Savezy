@@ -2,13 +2,11 @@
 
 import os
 import unittest
-from types import SimpleNamespace
-
-from flask import request
 
 from app import create_app
 from app.extensions import db
 from app.models import Expense, User
+from app.utils.jwt_helper import generate_jwt
 
 
 class ExpensesApiTestCase(unittest.TestCase):
@@ -17,38 +15,20 @@ class ExpensesApiTestCase(unittest.TestCase):
     def setUp(self):
         self.app = create_app("testing")
 
-        # Inject mock user into request context for testing
-        @self.app.before_request
-        def inject_test_user():
-            auth_header = request.headers.get("Authorization", "")
-            user_id = 1
-            email = None
-            name = None
-            if auth_header.startswith("Bearer "):
-                token = auth_header.removeprefix("Bearer ").strip()
-                if token:
-                    parts = token.split("|")
-                    try:
-                        user_id = int(parts[0])
-                    except (TypeError, ValueError):
-                        user_id = 1
-                    if len(parts) > 1:
-                        email = parts[1]
-                    if len(parts) > 2:
-                        name = parts[2]
-            request.user = SimpleNamespace(id=user_id, email=email, name=name)
-
         self.app_context = self.app.app_context()
         self.app_context.push()
         db.create_all()
 
-        # Seed a mock authenticated user (id must match Authorization header).
+        # Create test user
         user = User(id=1, email="user@example.com", name="Test User")
         db.session.add(user)
         db.session.commit()
 
+        # Generate JWT token for authentication
+        token = generate_jwt(user_id=user.id, email=user.email)
+
         self.client = self.app.test_client()
-        self.auth_header = {"Authorization": "Bearer 1|user@example.com|Test User"}
+        self.auth_header = {"Authorization": f"Bearer {token}"}
 
     def tearDown(self):
         db.session.remove()

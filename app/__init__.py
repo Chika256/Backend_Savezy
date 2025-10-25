@@ -2,7 +2,7 @@ from flask import Flask
 from flask_cors import CORS
 
 from config import config
-from app.extensions import db, migrate, jwt
+from app.extensions import db, migrate, jwt, limiter
 
 
 def create_app(config_name='default'):
@@ -16,6 +16,7 @@ def create_app(config_name='default'):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+    limiter.init_app(app)
     CORS(app, origins=app.config['CORS_ORIGINS'])
 
     # blueprints

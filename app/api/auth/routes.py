@@ -5,12 +5,15 @@ import requests
 import secrets
 import hashlib
 from app.utils.jwt_helper import generate_jwt
+from app.models import User
+from app.extensions import db, limiter
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 state_store = {}
 
 @auth_bp.route('/google/init', methods=['GET'])
+@limiter.limit("10 per minute")
 def google_init():
     mobile_redirect_uri = request.args.get('redirect_uri')
 
@@ -41,6 +44,7 @@ def google_init():
     return jsonify({'auth_url': auth_url}), 200
 
 @auth_bp.route('/google/callback', methods=['POST'])
+@limiter.limit("5 per minute")
 def google_callback():
     """
     Exchange authorization code for Google access token and return JWT
@@ -48,6 +52,7 @@ def google_callback():
     Expected request body:
     {
         "code": "AUTH_CODE_FROM_GOOGLE",
+        "state": "STATE_TOKEN_FROM_INIT",
         "redirect_uri": "myapp://auth/callback"
     }
     """
@@ -58,13 +63,28 @@ def google_callback():
             return jsonify({'error': 'Request body is required'}), 400
 
         auth_code = data.get('code')
+        state_token = data.get('state')
         mobile_redirect_uri = data.get('redirect_uri')
 
         if not auth_code:
             return jsonify({'error': 'Authorization code is required'}), 400
 
+        if not state_token:
+            return jsonify({'error': 'State token is required'}), 400
+
         if not mobile_redirect_uri:
             return jsonify({'error': 'redirect_uri is required'}), 400
+
+        # Validate state token to prevent CSRF attacks
+        if state_token not in state_store:
+            return jsonify({'error': 'Invalid or expired state token'}), 400
+
+        stored_redirect_uri = state_store.get(state_token)
+        if stored_redirect_uri != mobile_redirect_uri:
+            return jsonify({'error': 'redirect_uri does not match state'}), 400
+
+        # Remove used state token (one-time use)
+        del state_store[state_token]
 
         auth_code = unquote(auth_code)
 
@@ -117,30 +137,38 @@ def google_callback():
         if not google_id or not email:
             return jsonify({'error': 'Invalid user information from Google'}), 400
 
-        # TODO: create or update user in database
-        # For now, we'll just generate JWT with user info
-        # Once User model is created, add:
-        # user = User.query.filter_by(google_id=google_id).first()
-        # if not user:
-        #     user = User(google_id=google_id, email=email, name=name, picture=picture)
-        #     db.session.add(user)
-        # else:
-        #     user.name = name
-        #     user.picture = picture
-        #     user.last_login = datetime.utcnow()
-        # db.session.commit()
+        # Create or update user in database
+        try:
+            user = User.query.filter_by(email=email).first()
 
-        # generating JWT token
-        jwt_token = generate_jwt(user_id=google_id, email=email)
+            if not user:
+                # Create new user
+                user = User(email=email, name=name)
+                db.session.add(user)
+                db.session.commit()
+            else:
+                # Update existing user info
+                user.name = name
+                db.session.commit()
+
+        except Exception as db_error:
+            db.session.rollback()
+            return jsonify({
+                'error': 'Database error occurred',
+                'details': str(db_error)
+            }), 500
+
+        # Generate JWT token with database user ID
+        jwt_token = generate_jwt(user_id=user.id, email=user.email)
 
         # return success response with JWT and user info
         return jsonify({
             'success': True,
             'token': jwt_token,
             'user': {
-                'id': google_id,
-                'email': email,
-                'name': name,
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
                 'picture': picture
             }
         }), 200
@@ -152,6 +180,7 @@ def google_callback():
 
 
 @auth_bp.route('/token/verify', methods=['POST'])
+@limiter.limit("20 per minute")
 def verify_token():
     """
     Verify JWT token validity
@@ -160,14 +189,12 @@ def verify_token():
     {
         "token": "JWT_TOKEN_HERE"
     }
+    Or Authorization header: Bearer <token>
     """
     from app.utils.jwt_helper import decode_jwt
 
     try:
-        data = request.get_json()
-
-        if not data:
-            return jsonify({'error': 'Request body is required'}), 400
+        data = request.get_json(silent=True) or {}
 
         token = data.get('token')
 
@@ -198,6 +225,55 @@ def verify_token():
                 'iat': payload.get('iat'),
                 'exp': payload.get('exp')
             }
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+
+
+@auth_bp.route('/token/refresh', methods=['POST'])
+@limiter.limit("10 per minute")
+def refresh_token():
+    """
+    Refresh an expired or expiring JWT token
+
+    Expected request body:
+    {
+        "token": "JWT_TOKEN_HERE"
+    }
+    """
+    from app.utils.jwt_helper import refresh_jwt
+
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+
+        token = data.get('token')
+
+        if not token:
+            # Also check Authorization header
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '')
+
+        if not token:
+            return jsonify({'error': 'Token is required'}), 400
+
+        # Refresh the token
+        new_token = refresh_jwt(token)
+
+        if not new_token:
+            return jsonify({
+                'success': False,
+                'error': 'Token is invalid and cannot be refreshed'
+            }), 401
+
+        # Return new token
+        return jsonify({
+            'success': True,
+            'token': new_token
         }), 200
 
     except Exception as e:

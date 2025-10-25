@@ -6,8 +6,8 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
-# from app.auth.middleware import auth_required
-from app.models import Expense
+from app.utils.jwt_helper import token_required
+from app.models import Expense, User
 from app.utils.validators import validate_expense
 
 # Dedicated blueprint for expense management.
@@ -46,8 +46,8 @@ def _serialize_expense(expense):
 
 
 @expenses_bp.route("/api/expenses", methods=["POST"])
-# @auth_required
-def create_expense():
+@token_required
+def create_expense(jwt_payload):
     """Create a new expense scoped to the authenticated user."""
     payload = request.get_json(silent=True) or {}
 
@@ -56,7 +56,7 @@ def create_expense():
         return _json_response("Validation failed.", {"errors": errors}, status=400)
 
     expense = Expense(
-        user_id=request.user.id,
+        user_id=jwt_payload['user_id'],
         title=payload.get("title"),
         amount=float(payload.get("amount")),
         category=payload.get("category"),
@@ -88,8 +88,8 @@ def create_expense():
 
 
 @expenses_bp.route("/api/expenses", methods=["GET"])
-# @auth_required
-def list_expenses():
+@token_required
+def list_expenses(jwt_payload):
     """Return paginated expenses filtered and sorted for the current user."""
     page = request.args.get("page", default=1, type=int)
     limit = request.args.get("limit", default=10, type=int)
@@ -109,7 +109,7 @@ def list_expenses():
     sort_column = sortable_fields.get(sort, Expense.date)
     sort_order = sort_column.desc() if order == "desc" else sort_column.asc()
 
-    query = Expense.query.filter_by(user_id=request.user.id)
+    query = Expense.query.filter_by(user_id=jwt_payload['user_id'])
     if category:
         query = query.filter(Expense.category == category)
 
@@ -133,11 +133,11 @@ def list_expenses():
 
 
 @expenses_bp.route("/api/expenses/<int:expense_id>", methods=["GET"])
-# @auth_required
-def get_expense(expense_id):
+@token_required
+def get_expense(jwt_payload, expense_id):
     """Return a single expense owned by the authenticated user."""
     expense = Expense.query.filter_by(
-        id=expense_id, user_id=request.user.id
+        id=expense_id, user_id=jwt_payload['user_id']
     ).first()
 
     if not expense:
@@ -149,11 +149,11 @@ def get_expense(expense_id):
 
 
 @expenses_bp.route("/api/expenses/<int:expense_id>", methods=["PUT", "PATCH"])
-# @auth_required
-def update_expense(expense_id):
+@token_required
+def update_expense(jwt_payload, expense_id):
     """Update a user's expense with partial or full payloads."""
     expense = Expense.query.filter_by(
-        id=expense_id, user_id=request.user.id
+        id=expense_id, user_id=jwt_payload['user_id']
     ).first()
 
     if not expense:
@@ -201,11 +201,11 @@ def update_expense(expense_id):
 
 
 @expenses_bp.route("/api/expenses/<int:expense_id>", methods=["DELETE"])
-# @auth_required
-def delete_expense(expense_id):
+@token_required
+def delete_expense(jwt_payload, expense_id):
     """Delete an expense that belongs to the authenticated user."""
     expense = Expense.query.filter_by(
-        id=expense_id, user_id=request.user.id
+        id=expense_id, user_id=jwt_payload['user_id']
     ).first()
 
     if not expense:
