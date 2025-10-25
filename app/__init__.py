@@ -24,7 +24,9 @@ def create_app(config_name='default'):
     CORS(app, origins=app.config['CORS_ORIGINS'])
 
     # blueprints
-    # app.register_blueprint(auth.bp)
+    from app.routes import expenses_bp
+
+    app.register_blueprint(expenses_bp)
 
     # checking
     @app.route('/check')
