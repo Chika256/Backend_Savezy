@@ -1,8 +1,13 @@
 """Database models for the Savezy backend."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
-from app import db
+from app.extensions import db
+
+
+def utc_now():
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class User(db.Model):
@@ -50,7 +55,7 @@ class Expense(db.Model):
     title = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     category = db.Column(db.String(50), nullable=False)
-    date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    date = db.Column(db.DateTime, default=utc_now, nullable=False)
     description = db.Column(db.String(255))
 
     user = db.relationship("User", back_populates="expenses")

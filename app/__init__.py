@@ -1,17 +1,12 @@
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_jwt_extended import JWTManager
 from flask_cors import CORS
-from config import config
 
-db = SQLAlchemy()
-migrate = Migrate()
-jwt = JWTManager()
+from config import config
+from app.extensions import db, migrate, jwt
 
 
 def create_app(config_name='default'):
-    # Application factory
+    # app factory
     app = Flask(__name__)
 
     # config load
@@ -24,8 +19,10 @@ def create_app(config_name='default'):
     CORS(app, origins=app.config['CORS_ORIGINS'])
 
     # blueprints
-    from app.routes import expenses_bp
+    from app.api.auth.routes import auth_bp
+    from app.api.expenses.routes import expenses_bp
 
+    app.register_blueprint(auth_bp)
     app.register_blueprint(expenses_bp)
 
     # checking

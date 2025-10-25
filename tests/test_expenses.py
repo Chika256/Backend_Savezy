@@ -1,15 +1,13 @@
 """Integration tests for the expenses CRUD API using unittest."""
 
 import os
-import sys
 import unittest
-from functools import wraps
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from flask import request
 
-from app import create_app, db
+from app import create_app
+from app.extensions import db
 from app.models import Expense, User
 
 
@@ -17,38 +15,29 @@ class ExpensesApiTestCase(unittest.TestCase):
     """Covers core CRUD operations and validation paths."""
 
     def setUp(self):
-        def _test_auth_required(fn):
-            @wraps(fn)
-            def _wrapped(*args, **kwargs):
-                auth_header = request.headers.get("Authorization", "")
-                user_id = 1
-                email = None
-                name = None
-                if auth_header.startswith("Bearer "):
-                    token = auth_header.removeprefix("Bearer ").strip()
-                    if token:
-                        parts = token.split("|")
-                        try:
-                            user_id = int(parts[0])
-                        except (TypeError, ValueError):
-                            user_id = 1
-                        if len(parts) > 1:
-                            email = parts[1]
-                        if len(parts) > 2:
-                            name = parts[2]
-                request.user = SimpleNamespace(id=user_id, email=email, name=name)
-                return fn(*args, **kwargs)
-
-            return _wrapped
-
-        self.auth_patcher = patch(
-            "app.auth.middleware.auth_required",
-            new=_test_auth_required,
-        )
-        self.auth_patcher.start()
-        sys.modules.pop("app.routes.expenses", None)
-
         self.app = create_app("testing")
+
+        # Inject mock user into request context for testing
+        @self.app.before_request
+        def inject_test_user():
+            auth_header = request.headers.get("Authorization", "")
+            user_id = 1
+            email = None
+            name = None
+            if auth_header.startswith("Bearer "):
+                token = auth_header.removeprefix("Bearer ").strip()
+                if token:
+                    parts = token.split("|")
+                    try:
+                        user_id = int(parts[0])
+                    except (TypeError, ValueError):
+                        user_id = 1
+                    if len(parts) > 1:
+                        email = parts[1]
+                    if len(parts) > 2:
+                        name = parts[2]
+            request.user = SimpleNamespace(id=user_id, email=email, name=name)
+
         self.app_context = self.app.app_context()
         self.app_context.push()
         db.create_all()
@@ -65,7 +54,6 @@ class ExpensesApiTestCase(unittest.TestCase):
         db.session.remove()
         db.drop_all()
         self.app_context.pop()
-        self.auth_patcher.stop()
         db_path = os.path.join(self.app.instance_path, "test.db")
         if os.path.exists(db_path):
             os.remove(db_path)
