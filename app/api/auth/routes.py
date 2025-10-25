@@ -179,57 +179,106 @@ def google_callback():
         return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
 
 
-# @auth_bp.route('/token/verify', methods=['POST'])
-# @limiter.limit("20 per minute")
-# def verify_token():
-#     """
-#     Verify JWT token validity
-#
-#     Expected request body:
-#     {
-#         "token": "JWT_TOKEN_HERE"
-#     }
-#     Or Authorization header: Bearer <token>
-#     """
-#     from app.utils.jwt_helper import decode_jwt
-#
-#     try:
-#         data = request.get_json(silent=True) or {}
-#
-#         token = data.get('token')
-#
-#         if not token:
-#             # Also check Authorization header
-#             auth_header = request.headers.get('Authorization')
-#             if auth_header and auth_header.startswith('Bearer '):
-#                 token = auth_header.replace('Bearer ', '')
-#
-#         if not token:
-#             return jsonify({'error': 'Token is required'}), 400
-#
-#         # Decode and verify token
-#         payload = decode_jwt(token)
-#
-#         if not payload:
-#             return jsonify({
-#                 'valid': False,
-#                 'error': 'Token is invalid or expired'
-#             }), 401
-#
-#         # Return token validity and payload
-#         return jsonify({
-#             'valid': True,
-#             'payload': {
-#                 'user_id': payload.get('user_id'),
-#                 'email': payload.get('email'),
-#                 'iat': payload.get('iat'),
-#                 'exp': payload.get('exp')
-#             }
-#         }), 200
-#
-#     except Exception as e:
-#         return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
-#
+@auth_bp.route('/token/verify', methods=['POST'])
+@limiter.limit("20 per minute")
+def verify_token():
+    """
+    Verify JWT token validity
+
+    Expected request body:
+    {
+        "token": "JWT_TOKEN_HERE"
+    }
+    Or Authorization header: Bearer <token>
+    """
+    from app.utils.jwt_helper import decode_jwt
+
+    try:
+        data = request.get_json(silent=True) or {}
+
+        token = data.get('token')
+
+        if not token:
+            # Also check Authorization header
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '')
+
+        if not token:
+            return jsonify({'error': 'Token is required'}), 400
+
+        # Decode and verify token
+        payload = decode_jwt(token)
+
+        if not payload:
+            return jsonify({
+                'valid': False,
+                'error': 'Token is invalid or expired'
+            }), 401
+
+        # Return token validity and payload
+        return jsonify({
+            'valid': True,
+            'payload': {
+                'user_id': payload.get('user_id'),
+                'email': payload.get('email'),
+                'iat': payload.get('iat'),
+                'exp': payload.get('exp')
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+
+
+@auth_bp.route('/token/refresh', methods=['POST'])
+@limiter.limit("10 per minute")
+def refresh_token():
+    """
+    Refresh an expired or expiring JWT token
+
+    Expected request body:
+    {
+        "token": "JWT_TOKEN_HERE"
+    }
+    """
+    from app.utils.jwt_helper import refresh_jwt
+
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+
+        token = data.get('token')
+
+        if not token:
+            # Also check Authorization header
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '')
+
+        if not token:
+            return jsonify({'error': 'Token is required'}), 400
+
+        # Refresh the token
+        new_token = refresh_jwt(token)
+
+        if not new_token:
+            return jsonify({
+                'success': False,
+                'error': 'Token is invalid and cannot be refreshed'
+            }), 401
+
+        # Return new token
+        return jsonify({
+            'success': True,
+            'token': new_token
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+
 
 @auth_bp.route('/google/verify', methods=['POST'])
 @limiter.limit("10 per minute")
