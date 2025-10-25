@@ -100,6 +100,7 @@ def _card_not_found_response():
     )
 
 
+# X-Api-Key support for authentication from shortcuts - TODO
 @expenses_bp.route("/api/expenses", methods=["POST"])
 @token_required
 def create_expense(user_payload):

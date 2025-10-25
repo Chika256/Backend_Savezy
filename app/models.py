@@ -1,6 +1,7 @@
 """Database models for the Savezy backend."""
 
 from datetime import datetime, timezone
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
 
@@ -167,3 +168,17 @@ class Expense(db.Model):
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<Expense id={self.id} title={self.title!r} amount={self.amount}>"
+
+class APIKey(db.Model):
+    """API key for shortcut's request."""
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), nullable=False, unique=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user = db.relationship("User", back_populates="api_keys")
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
+    last_used_at = db.Column(db.DateTime)
+    is_active = db.Column(db.Boolean, default=True)

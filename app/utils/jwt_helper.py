@@ -52,6 +52,9 @@ def token_required(f):
     def decorated(*args, **kwargs):
         token = None
 
+        # if 'X-API-KEY' in request.headers:
+        #     token = request.headers['X-API-KEY']
+
         # getting token from header
         if 'Authorization' in request.headers:
             token = request.headers['Authorization'].replace('Bearer ', '')
