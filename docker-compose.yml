@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # Flask Application
+  app:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: savezy-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - FLASK_APP=run.py
+      - FLASK_ENV=${FLASK_ENV:-development}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///savezy.db}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-jwt-secret-key}
+      - JWT_ACCESS_TOKEN_EXPIRES=${JWT_ACCESS_TOKEN_EXPIRES:-3600}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}
+      - JWT_EXPIRATION_HOURS=${JWT_EXPIRATION_HOURS:-24}
+      - ALLOWED_MOBILE_REDIRECT_URIS=${ALLOWED_MOBILE_REDIRECT_URIS:-myapp://auth/callback,savezy://auth/callback}
+    volumes:
+      - ./:/app
+      - sqlite_data:/app/instance
+      - /app/__pycache__
+      - /app/.pytest_cache
+    networks:
+      - savezy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  sqlite_data:
+    driver: local
+
+networks:
+  savezy-network:
+    driver: bridge

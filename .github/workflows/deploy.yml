@@ -1,0 +1,69 @@
+name: Deploy to AWS EC2 (Direct)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  CONTAINER_NAME: savezy-backend-container
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          echo "$EC2_SSH_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          
+          # Copy files to EC2
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -i private_key.pem" \
+            --exclude '.git' \
+            --exclude '__pycache__' \
+            --exclude '*.pyc' \
+            --exclude '.env' \
+            --exclude 'venv' \
+            ./ ${EC2_USER}@${EC2_HOST}:~/savezy-backend/
+          
+          # Build and run on EC2
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ${EC2_USER}@${EC2_HOST} << 'EOF'
+            cd ~/savezy-backend
+            
+            # Stop and remove old container
+            docker stop ${{ env.CONTAINER_NAME }} || true
+            docker rm ${{ env.CONTAINER_NAME }} || true
+            
+            # Build new image
+            docker build -t savezy-backend:latest .
+            
+            # Run new container
+            docker run -d \
+              --name ${{ env.CONTAINER_NAME }} \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              --env-file ~/.env.production \
+              savezy-backend:latest
+            
+            # Clean up old images
+            docker image prune -af
+          EOF
+          
+          rm -f private_key.pem
+
+      - name: Verify deployment
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          sleep 10
+          curl -f http://${EC2_HOST}:3000/check || exit 1
