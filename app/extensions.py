@@ -24,7 +24,6 @@ limiter = Limiter(
 )
 oauth = OAuth() if OAuth else None
 
-
 def init_oauth(app):
     if oauth is None:
         raise RuntimeError("Authlib is not installed; cannot configure OAuth.")
