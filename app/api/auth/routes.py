@@ -401,7 +401,6 @@ def token_verify2():
         }), 200
 
     except Exception as e:
-<<<<<<< Updated upstream
         current_app.logger.error(f"Error in token_verify: {str(e)}")
         return jsonify({
             'success': False,
@@ -466,6 +465,3 @@ def token_refresh2():
             'success': False,
             'error': 'Internal server error'
         }), 500
-=======
-        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
->>>>>>> Stashed changes

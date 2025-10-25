@@ -2,6 +2,11 @@
 
 # Expenses API
 
+## Interactive Documentation
+
+- **Swagger UI:** Visit [`/docs`](http://localhost:5000/docs) when the server is running to explore and test endpoints.
+- **OpenAPI Spec:** The raw OpenAPI document is served at [`/openapi.yaml`](http://localhost:5000/openapi.yaml).
+
 ## Authentication
 
 All endpoints require a Google OAuth token. In local testing use an `Authorization` header with the format `Bearer <user_id>|<email>|<name>`.

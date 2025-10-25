@@ -1,21 +1,13 @@
 """Integration tests for the expenses CRUD API using unittest."""
 
 import os
-<<<<<<< Updated upstream
-=======
+import unittest
 
 os.environ.setdefault("JWT_SECRET_KEY", "dev-jwt-secret-key")
 
->>>>>>> Stashed changes
-import unittest
-
 from app import create_app
 from app.extensions import db
-<<<<<<< Updated upstream
-from app.models import Expense, User
-=======
 from app.models import Card, Category, Expense, User
->>>>>>> Stashed changes
 from app.utils.jwt_helper import generate_jwt
 
 
@@ -30,9 +22,6 @@ class ExpensesApiTestCase(unittest.TestCase):
         db.drop_all()
         db.create_all()
 
-<<<<<<< Updated upstream
-        # Create test user
-=======
         # Seed canonical categories expected by the API.
         slug_name_pairs = [
             ("investment", "Investment"),
@@ -48,17 +37,10 @@ class ExpensesApiTestCase(unittest.TestCase):
         }
 
         # Seed a mock authenticated user (id must match Authorization header).
->>>>>>> Stashed changes
         user = User(id=1, email="user@example.com", name="Test User")
         db.session.add(user)
         db.session.commit()
 
-<<<<<<< Updated upstream
-        # Generate JWT token for authentication
-        token = generate_jwt(user_id=user.id, email=user.email)
-
-        self.client = self.app.test_client()
-=======
         # Seed default cards for the user.
         self.primary_card = Card(
             user_id=user.id,
@@ -77,7 +59,6 @@ class ExpensesApiTestCase(unittest.TestCase):
 
         self.client = self.app.test_client()
         token = generate_jwt(user_id=1, email="user@example.com")
->>>>>>> Stashed changes
         self.auth_header = {"Authorization": f"Bearer {token}"}
 
     def tearDown(self):
