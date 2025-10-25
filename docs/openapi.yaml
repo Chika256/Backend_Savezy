@@ -1,0 +1,609 @@
+openapi: 3.1.0
+info:
+  title: Savezy API
+  version: 1.0.0
+  description: |
+    REST API for Savezy, providing authentication workflows and expense management
+    for authenticated users. All expense endpoints require a JWT Bearer token
+    issued by the authentication flow.
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+  - url: https://api.savezy.com
+    description: Production server (example)
+tags:
+  - name: Auth
+    description: Google OAuth and JWT token utilities
+  - name: Expenses
+    description: CRUD operations for user expenses
+paths:
+  /api/auth/google/init:
+    get:
+      tags: [Auth]
+      summary: Start Google OAuth flow
+      description: Returns the Google OAuth authorization URL for the mobile client.
+      parameters:
+        - name: redirect_uri
+          in: query
+          required: true
+          description: Mobile redirect URI registered in the backend configuration.
+          schema:
+            type: string
+            format: uri
+      responses:
+        '200':
+          description: Authorization URL generated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoogleInitResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /api/auth/google/callback:
+    post:
+      tags: [Auth]
+      summary: Exchange Google authorization code for JWT
+      description: |
+        Completes the Google OAuth authorization flow. Expects a one-time state token,
+        authorization code, and original mobile redirect URI.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleCallbackRequest'
+      responses:
+        '200':
+          description: JWT issued successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/auth/google/verify:
+    post:
+      tags: [Auth]
+      summary: Verify Google ID token from client SDKs
+      description: Verifies a Google ID token obtained directly from a mobile client and issues a JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoogleVerifyRequest'
+      responses:
+        '200':
+          description: JWT issued successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/auth/token/verify:
+    post:
+      tags: [Auth]
+      summary: Verify JWT token validity
+      description: Checks whether a JWT access token is valid and returns its payload.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: JWT token to verify (if not supplied in Authorization header).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Token is valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/auth/token/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh a JWT
+      description: Generates a new JWT using an existing (possibly expired) token.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Existing JWT to refresh (if not supplied in Authorization header).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: JWT refreshed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/expenses:
+    get:
+      tags: [Expenses]
+      summary: List expenses
+      description: Returns paginated expenses for the authenticated user with optional filters.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/CategoryFilter'
+        - $ref: '#/components/parameters/SortField'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: Expenses retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      tags: [Expenses]
+      summary: Create an expense
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '201':
+          description: Expense created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseSingleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/expenses/{expense_id}:
+    parameters:
+      - name: expense_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Expenses]
+      summary: Retrieve a single expense
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Expense retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseSingleResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Expenses]
+      summary: Update an expense
+      description: Applies partial updates to an expense owned by the user.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExpenseRequest'
+      responses:
+        '200':
+          description: Expense updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseSingleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Expenses]
+      summary: Delete an expense
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Expense deleted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Expense deleted successfully.
+                  data:
+                    type: object
+                    properties:
+                      expense_id:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number (1-indexed).
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      description: Number of items per page (1-100).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+    CategoryFilter:
+      name: category
+      in: query
+      description: Filter expenses by category slug.
+      schema:
+        type: string
+        enum: [investment, wants, need]
+    SortField:
+      name: sort
+      in: query
+      description: Field used for sorting.
+      schema:
+        type: string
+        enum: [date, amount, title, category, card]
+        default: date
+    SortOrder:
+      name: order
+      in: query
+      description: Sort order.
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+  responses:
+    BadRequest:
+      description: Invalid request or validation error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    GoogleInitResponse:
+      type: object
+      properties:
+        auth_url:
+          type: string
+          format: uri
+          example: https://accounts.google.com/o/oauth2/v2/auth?...state=abc
+    GoogleCallbackRequest:
+      type: object
+      required: [code, state, redirect_uri]
+      properties:
+        code:
+          type: string
+        state:
+          type: string
+        redirect_uri:
+          type: string
+          format: uri
+    GoogleVerifyRequest:
+      type: object
+      required: [id_token]
+      properties:
+        id_token:
+          type: string
+          description: Google ID token obtained from the client SDK.
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        token:
+          type: string
+          description: JWT access token issued by the backend.
+        user:
+          $ref: '#/components/schemas/User'
+    VerifyTokenResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          example: true
+        payload:
+          type: object
+          properties:
+            user_id:
+              type: integer
+            email:
+              type: string
+              format: email
+            iat:
+              type: integer
+              description: Issued at timestamp (epoch seconds).
+            exp:
+              type: integer
+              description: Expiration timestamp (epoch seconds).
+        error:
+          type: string
+          nullable: true
+          description: Present when the token is invalid.
+    RefreshTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        token:
+          type: string
+          description: Newly generated JWT access token.
+    Expense:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        title:
+          type: string
+        amount:
+          type: number
+          format: float
+        category:
+          type: string
+          description: Category slug (investment, wants, need).
+        category_name:
+          type: string
+          description: Human readable category label.
+        date:
+          type: string
+          format: date-time
+        description:
+          type: string
+          nullable: true
+        card:
+          allOf:
+            - $ref: '#/components/schemas/Card'
+          nullable: true
+    Card:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        name:
+          type: string
+        brand:
+          type: string
+          nullable: true
+        last_four:
+          type: string
+          nullable: true
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        picture:
+          type: string
+          format: uri
+          nullable: true
+    ExpenseListResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Expenses retrieved successfully.
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Expense'
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total_pages:
+                  type: integer
+                total_items:
+                  type: integer
+                has_next:
+                  type: boolean
+                has_prev:
+                  type: boolean
+            filters:
+              type: object
+              properties:
+                category:
+                  type: string
+                  nullable: true
+                sort:
+                  type: string
+                order:
+                  type: string
+    ExpenseSingleResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Expense created successfully.
+        data:
+          type: object
+          properties:
+            expense:
+              $ref: '#/components/schemas/Expense'
+    CreateExpenseRequest:
+      type: object
+      required:
+        - title
+        - amount
+        - category
+        - card_id
+      properties:
+        title:
+          type: string
+        amount:
+          type: number
+          format: float
+        category:
+          type: string
+          enum: [investment, wants, need]
+        description:
+          type: string
+          nullable: true
+        card_id:
+          type: integer
+        date:
+          type: string
+          format: date-time
+          nullable: true
+    UpdateExpenseRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        amount:
+          type: number
+          format: float
+        category:
+          type: string
+          enum: [investment, wants, need]
+        description:
+          type: string
+          nullable: true
+        card_id:
+          type: integer
+        date:
+          type: string
+          format: date-time
+          nullable: true
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Validation failed.
+        data:
+          type: object
+          additionalProperties: true
