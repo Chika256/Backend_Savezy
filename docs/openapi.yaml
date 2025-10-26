@@ -18,6 +18,8 @@ tags:
     description: CRUD operations for user expenses
   - name: Cards
     description: CRUD operations for stored cards
+  - name: Categories
+    description: CRUD operations for expense categories
 paths:
   /api/auth/google/init:
     get:
@@ -408,6 +410,151 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/categories:
+    get:
+      tags: [Categories]
+      summary: List categories
+      description: Returns paginated categories for the authenticated user with optional search.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: search
+          in: query
+          description: Filter categories by name or slug (case-insensitive).
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Field used for sorting (name, slug).
+          schema:
+            type: string
+            default: name
+        - name: order
+          in: query
+          description: Sort order.
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        '200':
+          description: Categories retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Categories]
+      summary: Create a category
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+      responses:
+        '201':
+          description: Category created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategorySingleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/categories/{category_id}:
+    parameters:
+      - name: category_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Categories]
+      summary: Retrieve a single category
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Category retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategorySingleResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Categories]
+      summary: Update a category
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCategoryRequest'
+      responses:
+        '200':
+          description: Category updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategorySingleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Categories]
+      summary: Delete a category
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Category deleted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Category deleted successfully.
+                  data:
+                    type: object
+                    properties:
+                      category_id:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Category cannot be deleted because it has associated expenses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       tags: [Cards]
       summary: Delete a card
@@ -781,6 +928,55 @@ components:
           properties:
             card:
               $ref: '#/components/schemas/Card'
+    CategoryListResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Categories retrieved successfully.
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Category'
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total_pages:
+                  type: integer
+                total_items:
+                  type: integer
+                has_next:
+                  type: boolean
+                has_prev:
+                  type: boolean
+            filters:
+              type: object
+              properties:
+                search:
+                  type: string
+                  nullable: true
+                sort:
+                  type: string
+                order:
+                  type: string
+    CategorySingleResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Category created successfully.
+        data:
+          type: object
+          properties:
+            category:
+              $ref: '#/components/schemas/Category'
     CreateCardRequest:
       type: object
       required:
@@ -828,6 +1024,24 @@ components:
         balance_left:
           type: number
           format: float
+    CreateCategoryRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
     CreateExpenseRequest:
       type: object
       required:

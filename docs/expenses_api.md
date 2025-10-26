@@ -98,3 +98,52 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
 - Missing or invalid authentication returns `401`.
 - Not found resources respond with `404`.
 - Deleting a card that still has expenses returns `409`.
+
+# Categories API
+
+### Category Reference
+
+| Name | Description |
+| --- | --- |
+| Others | Miscellaneous expenses |
+| Gifts & Donations | Presents, charity, and contributions |
+| Subscriptions | Streaming services, memberships, and recurring payments |
+| Personal Care | Haircuts, cosmetics, and personal grooming |
+| Travel | Flights, hotels, and vacation expenses |
+| Education | Tuition, books, courses, and learning materials |
+| Healthcare | Medical expenses, pharmacy, and health insurance |
+| Bills & Utilities | Rent, electricity, water, internet, and phone bills |
+| Entertainment | Movies, games, hobbies, and leisure activities |
+| Shopping | Clothing, electronics, and general retail |
+| Transportation | Gas, public transit, ride-sharing, and vehicle maintenance |
+| Food & Dining | Groceries, restaurants, and food delivery |
+
+### Create Category
+- **Method/Path:** `POST /api/categories`
+- **Body:**
+  - `name` *(string, required)*
+  - `description` *(string, optional)*
+- **Response:** `201` with `{ "category": {...} }`
+
+### List Categories
+- **Method/Path:** `GET /api/categories`
+- **Query Params:**
+  - `page`, `limit` *(pagination controls)*
+  - `search` *(string, optional; matches name or slug)*
+  - `sort` *(string, `name` or `slug`; default `name`)*
+  - `order` *(string, `asc` or `desc`; default `asc`)*
+- **Response:** `200` with paginated `items` including `id`, `name`, `slug`, and `description`.
+
+### Retrieve Category
+- **Method/Path:** `GET /api/categories/<id>`
+- **Response:** `200` with `{ "category": {...} }` or `404` if not found.
+
+### Update Category
+- **Method/Path:** `PUT/PATCH /api/categories/<id>`
+- **Body:** Any subset of `name` and `description` (renaming regenerates the slug).
+- **Response:** `200` with updated `category` or `404` if missing.
+
+### Delete Category
+- **Method/Path:** `DELETE /api/categories/<id>`
+- **Response:** `200` with `{ "category_id": <id> }` when deletion succeeds.
+- **Constraint:** Categories referenced by expenses respond with `409` until dependent expenses are removed.
