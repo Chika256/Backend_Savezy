@@ -22,6 +22,6 @@ htmlcov/
 .DS_Store
 migrations/versions/*.pyc
 tests/
-docs/
 *.md
 !README.md
+!docs/
