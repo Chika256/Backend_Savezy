@@ -77,6 +77,7 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
   - `sort` *(string, default `created`; accepted: `created`, `name`, `type`, `limit`, `total_balance`, `balance_left`)*
   - `order` *(string, `asc` or `desc`; default `desc`)*
 - **Response:** `200` with paginated `items`, each containing the serialized card object.
+  - Each item includes `last_four` but omits `brand` (fetch a single card for full metadata).
 
 ### Retrieve Card
 - **Method/Path:** `GET /api/cards/<id>`
