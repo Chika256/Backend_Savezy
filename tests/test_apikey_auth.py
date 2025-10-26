@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app import create_app
 from app.extensions import db
-from app.models import User, APIKey, Card, Category
+from app.models import User, APIKey, Card, Category, CardType
 from app.utils.keys_helper import generate_api_key
 from app.utils.jwt_helper import generate_jwt
 from datetime import datetime, timezone
@@ -47,7 +47,8 @@ def setup_test_data(app):
             user_id=user.id,
             name="Test Card",
             brand="Visa",
-            last_four="1234"
+            last_four="1234",
+            type=CardType.DEBIT,
         )
         db.session.add(card)
         db.session.commit()
