@@ -555,40 +555,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalError'
-    delete:
-      tags: [Cards]
-      summary: Delete a card
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: Card deleted successfully.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Card deleted successfully.
-                  data:
-                    type: object
-                    properties:
-                      card_id:
-                        type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Card cannot be deleted because it has associated expenses.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          $ref: '#/components/responses/InternalError'
-components:
+  components:
   securitySchemes:
     BearerAuth:
       type: http
