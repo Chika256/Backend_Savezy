@@ -10,6 +10,7 @@ from app.extensions import db
 from app.models import Card, Category, Expense
 from app.utils.jwt_helper import token_required
 from app.utils.validators import validate_expense
+from app.models import APIKey
 
 # Dedicated blueprint for expense management.
 expenses_bp = Blueprint("expenses", __name__)
@@ -72,6 +73,8 @@ def _serialize_expense(expense):
 
 def _extract_user_id(user_payload):
     """Get the integer user id from token payload."""
+    if isinstance(user_payload, APIKey):
+        return user_payload.user_id
     if not isinstance(user_payload, dict):
         return None
     try:

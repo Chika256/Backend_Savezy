@@ -33,6 +33,13 @@ class User(db.Model):
         lazy="dynamic",
     )
 
+    api_keys = db.relationship(
+        "APIKey",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+
     def to_dict(self):
         """Serialize the user for JSON responses."""
         return {
