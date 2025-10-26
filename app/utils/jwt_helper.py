@@ -6,7 +6,7 @@ from flask import request, jsonify
 from app.models import APIKey
 
 
-JWT_SECRET = os.getenv('JWT_SECRET_KEY')
+JWT_SECRET = os.getenv('JWT_SECRET_KEY', 'dev-jwt-secret-key')
 JWT_ALGORITHM = 'HS256'
 JWT_EXP_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', 24))
 

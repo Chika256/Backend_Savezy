@@ -1,4 +1,4 @@
-"""Savezy Expenses API reference."""
+"""Savezy Expenses and Cards API reference."""
 
 # Expenses API
 
@@ -26,7 +26,7 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
   - `date` *(ISO 8601 datetime, optional)*
 - **Response:** `201` with `{ "message": "Expense created successfully.", "data": { "expense": {...} } }`
   - `expense.category` is the stored slug; `expense.category_name` is the human-readable name.
-  - `expense.card` contains the linked card object with `id`, `name`, `brand`, and `last_four`.
+  - `expense.card` contains the linked card object (including type-specific fields).
 
 ### List Expenses
 - **Method/Path:** `GET /api/expenses`
@@ -53,7 +53,44 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
 - **Method/Path:** `DELETE /api/expenses/<id>`
 - **Response:** `200` with `{ "expense_id": <id> }` or `404` if missing.
 
+# Cards API
+
+### Create Card
+- **Method/Path:** `POST /api/cards`
+- **Body (minimum fields):**
+  - `name` *(string, required)*
+  - `type` *(string, required; enum: `credit`, `debit`, `prepaid`)*
+  - `limit` *(number, required when `type=credit`)*
+  - `total_balance` & `balance_left` *(numbers, required when `type=prepaid`; `balance_left <= total_balance`)*
+  - Optional fields: `apple_slug`, `brand`, `last_four`
+- **Response:** `201` with `{ "card": {...} }`
+
+### List Cards
+- **Method/Path:** `GET /api/cards`
+- **Query Params:**
+  - `page` *(int, default 1)*
+  - `limit` *(int, default 10, max 100)*
+  - `type` *(string, optional; enum: `credit`, `debit`, `prepaid`)*
+  - `sort` *(string, default `created`; accepted: `created`, `name`, `type`, `limit`, `total_balance`, `balance_left`)*
+  - `order` *(string, `asc` or `desc`; default `desc`)*
+- **Response:** `200` with paginated `items`, each containing the serialized card object.
+
+### Retrieve Card
+- **Method/Path:** `GET /api/cards/<id>`
+- **Response:** `200` with `{ "card": {...} }` or `404` if not found.
+
+### Update Card
+- **Method/Path:** `PUT/PATCH /api/cards/<id>`
+- **Body:** Any subset of card fields. Type transitions enforce the same validation rules as creation.
+- **Response:** `200` with updated card or `400`/`404` on validation/not-found issues.
+
+### Delete Card
+- **Method/Path:** `DELETE /api/cards/<id>`
+- **Response:** `200` with `{ "card_id": <id> }` when deletion succeeds.
+- **Constraint:** Cards referenced by expenses respond with `409` until dependent expenses are removed.
+
 ## Errors
 - Validation failures return `400` with details in `data.errors`.
 - Missing or invalid authentication returns `401`.
 - Not found resources respond with `404`.
+- Deleting a card that still has expenses returns `409`.

@@ -16,6 +16,8 @@ tags:
     description: Google OAuth and JWT token utilities
   - name: Expenses
     description: CRUD operations for user expenses
+  - name: Cards
+    description: CRUD operations for stored cards
 paths:
   /api/auth/google/init:
     get:
@@ -286,6 +288,153 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/cards:
+    get:
+      tags: [Cards]
+      summary: List cards
+      description: Returns paginated cards for the authenticated user with optional filtering.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: type
+          in: query
+          description: Filter by card type.
+          schema:
+            type: string
+            enum: [credit, debit, prepaid]
+        - name: sort
+          in: query
+          description: Field used for sorting (created, name, type, limit, total_balance, balance_left).
+          schema:
+            type: string
+            default: created
+        - name: order
+          in: query
+          description: Sort order.
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Cards retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Cards]
+      summary: Create a card
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCardRequest'
+      responses:
+        '201':
+          description: Card created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardSingleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/cards/{card_id}:
+    parameters:
+      - name: card_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Cards]
+      summary: Retrieve a single card
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Card retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardSingleResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Cards]
+      summary: Update a card
+      description: Applies partial updates to a card owned by the user.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCardRequest'
+      responses:
+        '200':
+          description: Card updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardSingleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags: [Cards]
+      summary: Delete a card
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Card deleted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Card deleted successfully.
+                  data:
+                    type: object
+                    properties:
+                      card_id:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Card cannot be deleted because it has associated expenses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   securitySchemes:
     BearerAuth:
@@ -471,11 +620,29 @@ components:
           type: integer
         name:
           type: string
+        type:
+          type: string
+          enum: [credit, debit, prepaid]
+        apple_slug:
+          type: string
+          nullable: true
         brand:
           type: string
           nullable: true
         last_four:
           type: string
+          nullable: true
+        limit:
+          type: number
+          format: float
+          nullable: true
+        total_balance:
+          type: number
+          format: float
+          nullable: true
+        balance_left:
+          type: number
+          format: float
           nullable: true
     Category:
       type: object
@@ -553,6 +720,96 @@ components:
           properties:
             expense:
               $ref: '#/components/schemas/Expense'
+    CardListResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Cards retrieved successfully.
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Card'
+            pagination:
+              type: object
+              properties:
+                page:
+                  type: integer
+                limit:
+                  type: integer
+                total_pages:
+                  type: integer
+                total_items:
+                  type: integer
+                has_next:
+                  type: boolean
+                has_prev:
+                  type: boolean
+            filters:
+              type: object
+              properties:
+                type:
+                  type: string
+                  nullable: true
+                sort:
+                  type: string
+                order:
+                  type: string
+    CardSingleResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Card created successfully.
+        data:
+          type: object
+          properties:
+            card:
+              $ref: '#/components/schemas/Card'
+    CreateCardRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [credit, debit, prepaid]
+        apple_slug:
+          type: string
+        limit:
+          type: number
+          format: float
+        total_balance:
+          type: number
+          format: float
+        balance_left:
+          type: number
+          format: float
+    UpdateCardRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [credit, debit, prepaid]
+        apple_slug:
+          type: string
+        limit:
+          type: number
+          format: float
+        total_balance:
+          type: number
+          format: float
+        balance_left:
+          type: number
+          format: float
     CreateExpenseRequest:
       type: object
       required:

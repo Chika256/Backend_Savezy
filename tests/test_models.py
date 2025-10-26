@@ -28,13 +28,20 @@ class ModelsTestCase(unittest.TestCase):
         self.category_map = {
             category.slug: category for category in Category.query.all()
         }
-        self.card = Card(user_id=1, name="Primary", brand="Visa", last_four="4242")
         # Ensure user exists ahead of card creation
         user = User(id=1, email="model@example.com", name="Model User")
         db.session.add(user)
-        db.session.add(self.card)
         db.session.commit()
         self.user = user
+        self.card = Card(
+            user_id=self.user.id,
+            name="Primary",
+            brand="Visa",
+            last_four="4242",
+            type="debit",
+        )
+        db.session.add(self.card)
+        db.session.commit()
 
     def tearDown(self):
         db.session.remove()
@@ -117,6 +124,8 @@ class ModelsTestCase(unittest.TestCase):
         self.assertEqual(serialized["id"], self.card.id)
         self.assertEqual(serialized["name"], "Primary")
         self.assertEqual(serialized["brand"], "Visa")
+        self.assertEqual(serialized["type"], "debit")
+        self.assertIsNone(serialized["limit"])
 
 
 if __name__ == "__main__":
