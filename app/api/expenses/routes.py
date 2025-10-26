@@ -1,7 +1,6 @@
 """Expenses blueprint exposing CRUD endpoints for authenticated users."""
 
 from datetime import datetime
-from enum import Enum
 
 from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
@@ -32,7 +31,7 @@ def _parse_date(value):
         return None
 
 
-def _normalize_expense_type(value):
+def _resolve_category(value):
     """Return the matching Category row when the slug is valid."""
     if value is None or not isinstance(value, str):
         return None
@@ -49,7 +48,17 @@ def _expense_type_error():
     allowed = sorted(ALLOWED_EXPENSE_TYPES)
     return _json_response(
         "Invalid expense type.",
-        {"errors": [f"Category must be one of: {', '.join(allowed)}."]},
+        {"errors": [f"type must be one of: {', '.join(allowed)}."]},
+        status=400,
+    )
+
+
+def _category_error():
+    """Common response for invalid category slug submissions."""
+    allowed = sorted(ALLOWED_EXPENSE_TYPES)
+    return _json_response(
+        "Invalid category.",
+        {"errors": [f"Category slug must be one of: {', '.join(allowed)}."]},
         status=400,
     )
 
@@ -63,6 +72,11 @@ def _serialize_expense(expense):
         "user_id": expense.user_id,
         "title": expense.title,
         "amount": expense.amount,
+        "type": (
+            expense.type.value
+            if hasattr(expense, "type") and expense.type is not None
+            else None
+        ),
         "category": expense.category.slug if expense.category else None,
         "category_name": expense.category.name if expense.category else None,
         "date": expense.date.isoformat() if expense.date else None,
@@ -110,13 +124,18 @@ def create_expense(user_payload):
     """Create a new expense scoped to the authenticated user."""
     payload = request.get_json(silent=True) or {}
 
-    errors = validate_expense(payload)
+    errors = validate_expense(
+        payload,
+        allowed_types=ALLOWED_EXPENSE_TYPES,
+        require_type=True,
+    )
     if errors:
         return _json_response("Validation failed.", {"errors": errors}, status=400)
 
-    category = _normalize_expense_type(payload.get("category"))
+    category = _resolve_category(payload.get("category"))
     if not category:
-        return _expense_type_error()
+        return _category_error()
+    expense_type = payload.get("type", "").strip().lower()
 
     user_id = _extract_user_id(user_payload)
     if user_id is None:
@@ -130,6 +149,7 @@ def create_expense(user_payload):
         user_id=user_id,
         title=payload.get("title"),
         amount=float(payload.get("amount")),
+        type=Expense.ExpenseType(expense_type),
         category=category,
         card=card,
         description=payload.get("description"),
@@ -168,13 +188,19 @@ def list_expenses(user_payload):
     page = max(page, 1)
     limit = max(1, min(limit, 100))
 
+    type_filter = request.args.get("type")
+    if type_filter:
+        type_filter = type_filter.strip().lower()
+        if type_filter not in ALLOWED_EXPENSE_TYPES:
+            return _expense_type_error()
+
     raw_category = request.args.get("category")
     category_row = None
     category_slug = None
     if raw_category:
-        category_row = _normalize_expense_type(raw_category)
+        category_row = _resolve_category(raw_category)
         if not category_row:
-            return _expense_type_error()
+            return _category_error()
         category_slug = category_row.slug
 
     sort = request.args.get("sort", default="date").lower()
@@ -186,6 +212,7 @@ def list_expenses(user_payload):
         "title": Expense.title,
         "category": Category.slug,
         "card": Card.name,
+        "type": Expense.type,
     }
     sort_column = sortable_fields.get(sort, Expense.date)
     sort_order = sort_column.desc() if order == "desc" else sort_column.asc()
@@ -202,6 +229,8 @@ def list_expenses(user_payload):
 
     if category_row:
         query = query.filter(Expense.category == category_row)
+    if type_filter:
+        query = query.filter(Expense.type == Expense.ExpenseType(type_filter))
 
     pagination = query.order_by(sort_order).paginate(
         page=page, per_page=limit, error_out=False
@@ -217,7 +246,12 @@ def list_expenses(user_payload):
             "has_next": pagination.has_next,
             "has_prev": pagination.has_prev,
         },
-        "filters": {"category": category_slug, "sort": sort, "order": order},
+        "filters": {
+            "category": category_slug,
+            "type": type_filter,
+            "sort": sort,
+            "order": order,
+        },
     }
     return _json_response("Expenses retrieved successfully.", data, status=200)
 
@@ -256,18 +290,36 @@ def update_expense(user_payload, expense_id):
     payload = request.get_json(silent=True) or {}
 
     if "category" in payload:
-        category_row = _normalize_expense_type(payload.get("category"))
+        category_row = _resolve_category(payload.get("category"))
         if not category_row:
-            return _expense_type_error()
+            return _category_error()
     else:
         category_row = expense.category
+
+    if "type" in payload:
+        new_type = payload.get("type")
+        if not isinstance(new_type, str):
+            return _expense_type_error()
+        new_type = new_type.strip().lower()
+        if new_type not in ALLOWED_EXPENSE_TYPES:
+            return _expense_type_error()
+    else:
+        current_type = (
+            expense.type.value if expense.type else Expense.ExpenseType.NEED.value
+        )
+        new_type = current_type
 
     merged_payload = {
         "title": payload.get("title", expense.title),
         "amount": payload.get("amount", expense.amount),
         "category": category_row.slug if category_row else None,
+        "type": new_type,
     }
-    errors = validate_expense(merged_payload)
+    errors = validate_expense(
+        merged_payload,
+        allowed_types=ALLOWED_EXPENSE_TYPES,
+        require_type=False,
+    )
     if errors:
         return _json_response("Validation failed.", {"errors": errors}, status=400)
 
@@ -277,6 +329,7 @@ def update_expense(user_payload, expense_id):
         expense.amount = float(payload["amount"])
     if "category" in payload and category_row:
         expense.category = category_row
+    expense.type = Expense.ExpenseType(new_type)
     if "card_id" in payload:
         card = _load_card_for_user(payload.get("card_id"), user_id)
         if not card:
@@ -332,13 +385,7 @@ def delete_expense(user_payload, expense_id):
     return _json_response("Expense deleted successfully.", {"expense_id": expense_id}, 200)
 
 
-# Canonical expense types.
-class ExpenseType(str, Enum):
-    """Enumerated expense categories."""
-
-    INVESTMENT = "investment"
-    WANTS = "wants"
-    NEED = "need"
-
-
-ALLOWED_EXPENSE_TYPES = {expense_type.value for expense_type in ExpenseType}
+# Canonical expense types shared across the API.
+ALLOWED_EXPENSE_TYPES = {
+    expense_type.value for expense_type in Expense.ExpenseType
+}

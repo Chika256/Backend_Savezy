@@ -77,14 +77,21 @@ class ExpensesApiTestCase(unittest.TestCase):
             "title": "Coffee",
             "amount": 5.0,
             "category": "need",
+            "type": "need",
             "description": "Morning coffee",
             "card": self.primary_card,
         }
         defaults.update(kwargs)
         category_slug = defaults.pop("category")
         category = self.category_map[category_slug]
+        expense_type = defaults.pop("type")
         card = defaults.pop("card")
-        expense = Expense(category=category, card=card, **defaults)
+        expense = Expense(
+            category=category,
+            card=card,
+            type=Expense.ExpenseType(expense_type),
+            **defaults,
+        )
         db.session.add(expense)
         db.session.commit()
         return expense
@@ -94,6 +101,7 @@ class ExpensesApiTestCase(unittest.TestCase):
             "title": "Lunch",
             "amount": 12.5,
             "category": "need",
+            "type": "need",
             "description": "Team lunch",
             "card_id": self.primary_card.id,
         }
@@ -106,6 +114,7 @@ class ExpensesApiTestCase(unittest.TestCase):
         self.assertEqual(data["data"]["expense"]["category"], "need")
         self.assertEqual(data["data"]["expense"]["category_name"], "Need")
         self.assertEqual(data["data"]["expense"]["card"]["id"], self.primary_card.id)
+        self.assertEqual(data["data"]["expense"]["type"], "need")
 
     def test_create_expense_validation_error(self):
         payload = {"title": "", "amount": "invalid", "category": ""}
@@ -120,19 +129,21 @@ class ExpensesApiTestCase(unittest.TestCase):
             "title": "Movie night",
             "amount": 15,
             "category": "entertainment",
+            "type": "wants",
             "card_id": self.primary_card.id,
         }
         response = self.client.post("/api/expenses", json=payload, headers=self.auth_header)
 
         self.assertEqual(response.status_code, 400)
         data = response.get_json()
-        self.assertIn("Category must be one of", data["data"]["errors"][0])
+        self.assertIn("Category slug must be", data["data"]["errors"][0])
 
     def test_create_expense_invalid_card(self):
         payload = {
             "title": "Dinner",
             "amount": 30,
             "category": "need",
+            "type": "need",
             "card_id": 999,
         }
         response = self.client.post("/api/expenses", json=payload, headers=self.auth_header)
@@ -144,8 +155,12 @@ class ExpensesApiTestCase(unittest.TestCase):
     def test_list_expenses_with_filtering_and_pagination(self):
         self._create_expense(title="Breakfast", category="need", amount=8)
         self._create_expense(title="Groceries", category="need", amount=25)
-        self._create_expense(title="Brokerage", category="investment", amount=50)
-        self._create_expense(title="Concert", category="wants", amount=120)
+        self._create_expense(
+            title="Brokerage", category="investment", type="investment", amount=50
+        )
+        self._create_expense(
+            title="Concert", category="wants", type="wants", amount=120
+        )
 
         response = self.client.get(
             "/api/expenses?category=need&sort=amount&order=asc&limit=2&page=1",
@@ -191,7 +206,7 @@ class ExpensesApiTestCase(unittest.TestCase):
 
     def test_update_expense_category_change(self):
         expense = self._create_expense(title="Utilities", category="need", amount=90)
-        payload = {"category": "investment"}
+        payload = {"category": "investment", "type": "investment"}
 
         response = self.client.patch(
             f"/api/expenses/{expense.id}", json=payload, headers=self.auth_header
@@ -201,6 +216,7 @@ class ExpensesApiTestCase(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data["data"]["expense"]["category"], "investment")
         self.assertEqual(data["data"]["expense"]["category_name"], "Investment")
+        self.assertEqual(data["data"]["expense"]["type"], "investment")
 
     def test_update_expense_card_change(self):
         expense = self._create_expense(title="Groceries", category="need", amount=45)

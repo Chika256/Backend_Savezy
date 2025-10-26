@@ -149,6 +149,7 @@ class CardsApiTestCase(unittest.TestCase):
             title="Groceries",
             amount=50,
             category=self.need_category,
+            type=Expense.ExpenseType.NEED,
             card=card,
         )
         db.session.add(expense)
