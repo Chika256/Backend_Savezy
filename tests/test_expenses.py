@@ -7,7 +7,7 @@ os.environ.setdefault("JWT_SECRET_KEY", "dev-jwt-secret-key")
 
 from app import create_app
 from app.extensions import db
-from app.models import Card, Category, Expense, User
+from app.models import Card, CardType, Category, Expense, User
 from app.utils.jwt_helper import generate_jwt
 
 
@@ -47,12 +47,14 @@ class ExpensesApiTestCase(unittest.TestCase):
             name="Primary Card",
             brand="Visa",
             last_four="4242",
+            type=CardType.DEBIT,
         )
         self.secondary_card = Card(
             user_id=user.id,
             name="Backup Card",
             brand="Mastercard",
             last_four="1111",
+            type=CardType.DEBIT,
         )
         db.session.add_all([self.primary_card, self.secondary_card])
         db.session.commit()

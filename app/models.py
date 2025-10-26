@@ -1,6 +1,8 @@
 """Database models for the Savezy backend."""
 
 from datetime import datetime, timezone
+from enum import Enum
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
 
@@ -32,6 +34,13 @@ class User(db.Model):
         lazy="dynamic",
     )
 
+    api_keys = db.relationship(
+        "APIKey",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+
     def to_dict(self):
         """Serialize the user for JSON responses."""
         return {
@@ -42,6 +51,14 @@ class User(db.Model):
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<User id={self.id} email={self.email!r}>"
+
+
+class CardType(str, Enum):
+    """Enumerated card types supported by the system."""
+
+    CREDIT = "credit"
+    DEBIT = "debit"
+    PREPAID = "prepaid"
 
 
 class Card(db.Model):
@@ -56,8 +73,13 @@ class Card(db.Model):
         nullable=False,
     )
     name = db.Column(db.String(100), nullable=False)
+    apple_slug = db.Column(db.String(100))
     brand = db.Column(db.String(50))
     last_four = db.Column(db.String(4))
+    type = db.Column(db.Enum(CardType), nullable=False, default=CardType.DEBIT)
+    credit_limit = db.Column(db.Numeric(12, 2))
+    total_balance = db.Column(db.Numeric(12, 2))
+    balance_left = db.Column(db.Numeric(12, 2))
 
     user = db.relationship("User", back_populates="cards")
     expenses = db.relationship(
@@ -69,16 +91,23 @@ class Card(db.Model):
 
     def to_dict(self):
         """Serialize the card for JSON responses."""
-        return {
+        serialized = {
             "id": self.id,
             "user_id": self.user_id,
             "name": self.name,
+            "type": self.type.value if isinstance(self.type, CardType) else self.type,
+            "apple_slug": self.apple_slug,
             "brand": self.brand,
             "last_four": self.last_four,
+            "limit": float(self.credit_limit) if self.credit_limit is not None else None,
+            "total_balance": float(self.total_balance) if self.total_balance is not None else None,
+            "balance_left": float(self.balance_left) if self.balance_left is not None else None,
         }
+        return serialized
 
     def __repr__(self) -> str:  # pragma: no cover
-        return f"<Card id={self.id} name={self.name!r}>"
+        card_type = self.type.value if isinstance(self.type, CardType) else self.type
+        return f"<Card id={self.id} name={self.name!r} type={card_type}>"
 
 
 class Category(db.Model):
@@ -167,3 +196,17 @@ class Expense(db.Model):
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<Expense id={self.id} title={self.title!r} amount={self.amount}>"
+
+class APIKey(db.Model):
+    """API key for shortcut's request."""
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), nullable=False, unique=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user = db.relationship("User", back_populates="api_keys")
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
+    last_used_at = db.Column(db.DateTime)
+    is_active = db.Column(db.Boolean, default=True)

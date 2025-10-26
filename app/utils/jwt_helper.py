@@ -3,8 +3,10 @@ import os
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify
+from app.models import APIKey
 
-JWT_SECRET = os.getenv('JWT_SECRET_KEY')
+
+JWT_SECRET = os.getenv('JWT_SECRET_KEY', 'dev-jwt-secret-key')
 JWT_ALGORITHM = 'HS256'
 JWT_EXP_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', 24))
 
@@ -51,6 +53,14 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
+
+        if 'X-Api-Key' in request.headers:
+            token = request.headers['X-Api-Key']
+            key = APIKey.query.filter_by(key=token).first()
+            if not key:
+                return jsonify({'error': 'Invalid API key'}), 401
+            else:
+                return f(key, *args, **kwargs)
 
         # getting token from header
         if 'Authorization' in request.headers:
