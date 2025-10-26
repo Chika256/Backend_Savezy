@@ -57,10 +57,12 @@ def create_app(config_name='default'):
     from app.api.auth.routes import auth_bp
     from app.api.expenses.routes import expenses_bp
     from app.api.cards import cards_bp
+    from app.api.categories.routes import categories_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(expenses_bp)
     app.register_blueprint(cards_bp)
+    app.register_blueprint(categories_bp)
 
     @app.route("/openapi.yaml")
     def openapi_spec():

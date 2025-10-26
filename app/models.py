@@ -148,6 +148,11 @@ class Expense(db.Model):
         db.Index("ix_expenses_user_category", "user_id", "category_id"),
     )
 
+    class ExpenseType(str, Enum):
+        INVESTMENT = "investment"
+        WANTS = "wants"
+        NEED = "need"
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(
         db.Integer,
@@ -158,6 +163,11 @@ class Expense(db.Model):
         db.Integer,
         db.ForeignKey("categories.id", ondelete="RESTRICT"),
         nullable=False,
+    )
+    type = db.Column(
+        db.Enum(ExpenseType),
+        nullable=False,
+        default=ExpenseType.NEED,
     )
     card_id = db.Column(
         db.Integer,
@@ -179,10 +189,11 @@ class Expense(db.Model):
             "id": self.id,
             "user_id": self.user_id,
             "title": self.title,
-            "amount": self.amount,
-            "date": self.date.isoformat() if self.date else None,
-            "description": self.description,
-        }
+        "amount": self.amount,
+        "date": self.date.isoformat() if self.date else None,
+        "description": self.description,
+        "type": self.type.value if isinstance(self.type, Expense.ExpenseType) else self.type,
+    }
         if self.category:
             serialized["category"] = self.category.slug
             serialized["category_name"] = self.category.name

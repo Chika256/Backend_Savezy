@@ -76,6 +76,25 @@ def _validate_card_payload(payload, *, partial=False):
         else:
             normalized["apple_slug"] = slug.strip() if isinstance(slug, str) else None
 
+    if "brand" in payload:
+        brand = payload.get("brand")
+        if brand is not None and not isinstance(brand, str):
+            errors.append("brand must be a string.")
+        else:
+            normalized["brand"] = brand.strip() if isinstance(brand, str) else None
+
+    if "last_four" in payload:
+        last_four = payload.get("last_four")
+        if last_four is not None:
+            if not isinstance(last_four, str):
+                errors.append("last_four must be a string.")
+            else:
+                digits = last_four.strip()
+                if len(digits) != 4 or not digits.isdigit():
+                    errors.append("last_four must be a four digit string.")
+                else:
+                    normalized["last_four"] = digits
+
     # Numeric fields
     if "limit" in payload:
         normalized["limit"] = _parse_decimal(payload.get("limit"), "limit", errors)
@@ -118,9 +137,12 @@ def _validate_card_payload(payload, *, partial=False):
     return normalized, errors
 
 
-def _serialize_card(card):
+def _serialize_card(card, *, include_brand=True):
     """Serialize a card ORM instance."""
-    return card.to_dict()
+    serialized = card.to_dict()
+    if not include_brand:
+        serialized.pop("brand", None)
+    return serialized
 
 
 @cards_bp.route("", methods=["POST"])
@@ -144,6 +166,8 @@ def create_card(user_payload):
         credit_limit=data.get("limit"),
         total_balance=data.get("total_balance"),
         balance_left=data.get("balance_left"),
+        brand=data.get("brand"),
+        last_four=data.get("last_four"),
     )
 
     try:
@@ -203,7 +227,9 @@ def list_cards(user_payload):
     )
 
     data = {
-        "items": [_serialize_card(card) for card in pagination.items],
+        "items": [
+            _serialize_card(card, include_brand=False) for card in pagination.items
+        ],
         "pagination": {
             "page": pagination.page,
             "limit": pagination.per_page,
@@ -253,6 +279,10 @@ def update_card(user_payload, card_id):
         card.name = data["name"]
     if "apple_slug" in data:
         card.apple_slug = data["apple_slug"]
+    if "brand" in data:
+        card.brand = data["brand"]
+    if "last_four" in data:
+        card.last_four = data["last_four"]
     if "type" in data:
         card.type = CardType(data["type"])
     if "limit" in data:

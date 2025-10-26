@@ -21,11 +21,13 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
   - `title` *(string, required)*
   - `amount` *(number, required)*
   - `category` *(string, required; enum: `investment`, `wants`, `need`)*
+  - `type` *(string, required; enum: `investment`, `wants`, `need`)*
   - `card_id` *(integer, required; references saved card)*
   - `description` *(string, optional)*
   - `date` *(ISO 8601 datetime, optional)*
 - **Response:** `201` with `{ "message": "Expense created successfully.", "data": { "expense": {...} } }`
   - `expense.category` is the stored slug; `expense.category_name` is the human-readable name.
+  - `expense.type` reflects the high-level classification (`wants`, `need`, `investment`).
   - `expense.card` contains the linked card object (including type-specific fields).
 
 ### List Expenses
@@ -34,11 +36,12 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
   - `page` *(int, default 1)*
   - `limit` *(int, default 10, max 100)*
   - `category` *(string, optional; enum: `investment`, `wants`, `need`)*
-  - `sort` *(string, one of: `date`, `amount`, `title`, `category`; default `date`)*
+  - `type` *(string, optional; enum: `investment`, `wants`, `need`)*
+  - `sort` *(string, one of: `date`, `amount`, `title`, `category`, `type`; default `date`)*
   - `order` *(string, `asc` or `desc`; default `desc`)*
 - **Response:** `200` with paginated items in `data.items`.
   - Each item includes both `category` (slug) and `category_name`.
-  - Each item includes the nested `card` object.
+  - Each item includes the `type` field and the nested `card` object.
 
 ### Retrieve Expense
 - **Method/Path:** `GET /api/expenses/<id>`
@@ -46,7 +49,7 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
 
 ### Update Expense
 - **Method/Path:** `PUT/PATCH /api/expenses/<id>`
-- **Body:** Any subset of fields from creation payload.
+- **Body:** Any subset of fields from creation payload (type/category updates must use valid enums).
 - **Response:** `200` with updated `expense` or `404` when not found.
 
 ### Delete Expense
@@ -74,6 +77,7 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
   - `sort` *(string, default `created`; accepted: `created`, `name`, `type`, `limit`, `total_balance`, `balance_left`)*
   - `order` *(string, `asc` or `desc`; default `desc`)*
 - **Response:** `200` with paginated `items`, each containing the serialized card object.
+  - Each item includes `last_four` but omits `brand` (fetch a single card for full metadata).
 
 ### Retrieve Card
 - **Method/Path:** `GET /api/cards/<id>`
@@ -94,3 +98,52 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
 - Missing or invalid authentication returns `401`.
 - Not found resources respond with `404`.
 - Deleting a card that still has expenses returns `409`.
+
+# Categories API
+
+### Category Reference
+
+| Name | Description |
+| --- | --- |
+| Others | Miscellaneous expenses |
+| Gifts & Donations | Presents, charity, and contributions |
+| Subscriptions | Streaming services, memberships, and recurring payments |
+| Personal Care | Haircuts, cosmetics, and personal grooming |
+| Travel | Flights, hotels, and vacation expenses |
+| Education | Tuition, books, courses, and learning materials |
+| Healthcare | Medical expenses, pharmacy, and health insurance |
+| Bills & Utilities | Rent, electricity, water, internet, and phone bills |
+| Entertainment | Movies, games, hobbies, and leisure activities |
+| Shopping | Clothing, electronics, and general retail |
+| Transportation | Gas, public transit, ride-sharing, and vehicle maintenance |
+| Food & Dining | Groceries, restaurants, and food delivery |
+
+### Create Category
+- **Method/Path:** `POST /api/categories`
+- **Body:**
+  - `name` *(string, required)*
+  - `description` *(string, optional)*
+- **Response:** `201` with `{ "category": {...} }`
+
+### List Categories
+- **Method/Path:** `GET /api/categories`
+- **Query Params:**
+  - `page`, `limit` *(pagination controls)*
+  - `search` *(string, optional; matches name or slug)*
+  - `sort` *(string, `name` or `slug`; default `name`)*
+  - `order` *(string, `asc` or `desc`; default `asc`)*
+- **Response:** `200` with paginated `items` including `id`, `name`, `slug`, and `description`.
+
+### Retrieve Category
+- **Method/Path:** `GET /api/categories/<id>`
+- **Response:** `200` with `{ "category": {...} }` or `404` if not found.
+
+### Update Category
+- **Method/Path:** `PUT/PATCH /api/categories/<id>`
+- **Body:** Any subset of `name` and `description` (renaming regenerates the slug).
+- **Response:** `200` with updated `category` or `404` if missing.
+
+### Delete Category
+- **Method/Path:** `DELETE /api/categories/<id>`
+- **Response:** `200` with `{ "category_id": <id> }` when deletion succeeds.
+- **Constraint:** Categories referenced by expenses respond with `409` until dependent expenses are removed.

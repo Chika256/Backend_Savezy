@@ -58,6 +58,7 @@ class ModelsTestCase(unittest.TestCase):
             title="Monthly rent",
             amount=1200.0,
             category=self.category_map["need"],
+            type=Expense.ExpenseType.NEED,
             card=self.card,
             description="Apartment rent",
         )
@@ -78,6 +79,7 @@ class ModelsTestCase(unittest.TestCase):
         self.assertEqual(serialized["date"], expense.date.isoformat())
         self.assertEqual(serialized["card"]["id"], self.card.id)
         self.assertEqual(serialized["card"]["name"], "Primary")
+        self.assertEqual(serialized["type"], "need")
 
     def test_user_expense_relationship_and_cascade(self):
         """Deleting a user should cascade to their expenses."""
@@ -86,6 +88,7 @@ class ModelsTestCase(unittest.TestCase):
             title="Index fund",
             amount=300.0,
             category=self.category_map["investment"],
+            type=Expense.ExpenseType.INVESTMENT,
             card=self.card,
         )
         second = Expense(
@@ -93,6 +96,7 @@ class ModelsTestCase(unittest.TestCase):
             title="Gym membership",
             amount=45.0,
             category=self.category_map["wants"],
+            type=Expense.ExpenseType.WANTS,
             card=self.card,
         )
         db.session.add_all([first, second])

@@ -48,6 +48,7 @@ class CardsApiTestCase(unittest.TestCase):
             "user_id": self.user.id,
             "name": "Daily Debit",
             "type": CardType.DEBIT,
+            "last_four": "0000",
         }
         defaults.update(kwargs)
         card = Card(**defaults)
@@ -65,6 +66,7 @@ class CardsApiTestCase(unittest.TestCase):
         self.assertIn("limit is required for credit cards.", data["data"]["errors"])
 
         payload["limit"] = "5000"
+        payload["last_four"] = "4242"
         response = self.client.post(
             "/api/cards", json=payload, headers=self.auth_header
         )
@@ -72,6 +74,7 @@ class CardsApiTestCase(unittest.TestCase):
         data = response.get_json()
         self.assertEqual(data["data"]["card"]["name"], "Rewards")
         self.assertEqual(data["data"]["card"]["limit"], 5000.0)
+        self.assertEqual(data["data"]["card"]["last_four"], "4242")
 
     def test_create_prepaid_card_validation(self):
         payload = {"name": "Travel Wallet", "type": "prepaid", "total_balance": "200"}
@@ -112,6 +115,7 @@ class CardsApiTestCase(unittest.TestCase):
             type=CardType.PREPAID,
             total_balance=600,
             balance_left=400,
+            last_four="5678",
         )
 
         response = self.client.get(
@@ -123,6 +127,8 @@ class CardsApiTestCase(unittest.TestCase):
         self.assertEqual(len(data["data"]["items"]), 1)
         self.assertEqual(data["data"]["items"][0]["name"], "Premium Credit")
         self.assertEqual(data["data"]["filters"]["type"], "credit")
+        self.assertIn("last_four", data["data"]["items"][0])
+        self.assertNotIn("brand", data["data"]["items"][0])
 
     def test_update_card_to_prepaid(self):
         card = self._create_card(name="Flex", type=CardType.DEBIT)
@@ -149,6 +155,7 @@ class CardsApiTestCase(unittest.TestCase):
             title="Groceries",
             amount=50,
             category=self.need_category,
+            type=Expense.ExpenseType.NEED,
             card=card,
         )
         db.session.add(expense)
