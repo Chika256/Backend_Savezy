@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-"""
-Utility script to insert a provided API key into the database.
-
-Usage examples:
-  python add_api_key.py --email user@example.com --key sk_XXXX
-  python add_api_key.py --key sk_XXXX               # uses default email
-
-Notes:
-- If the user doesn't exist it will be created.
-- If an API key with the same value already exists, the script will exit gracefully.
-"""
 import argparse
 from datetime import datetime, timezone
 
