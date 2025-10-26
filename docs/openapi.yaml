@@ -794,6 +794,12 @@ components:
           enum: [credit, debit, prepaid]
         apple_slug:
           type: string
+        brand:
+          type: string
+          nullable: true
+        last_four:
+          type: string
+          nullable: true
         limit:
           type: number
           format: float
