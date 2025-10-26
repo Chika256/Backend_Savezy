@@ -106,6 +106,7 @@ curl -X POST http://localhost:5000/api/expenses \\
     "title": "Test Expense",
     "amount": 10.50,
     "category": "Food",
+    "type": "need",
     "description": "Testing authentication"
   }}'
         ''')

@@ -98,6 +98,7 @@ def test_apikey_auth(base_url, api_key, card_id):
         "title": "Test Expense (API Key)",
         "amount": 25.50,
         "category": "need",
+        "type": "need",
         "card_id": card_id,
         "description": "Testing X-API-Key authentication"
     }
@@ -149,6 +150,7 @@ def test_jwt_auth(base_url, jwt_token, card_id):
         "title": "Test Expense (JWT)",
         "amount": 15.75,
         "category": "need",
+        "type": "need",
         "card_id": card_id,
         "description": "Testing JWT Bearer token authentication"
     }

@@ -21,11 +21,13 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
   - `title` *(string, required)*
   - `amount` *(number, required)*
   - `category` *(string, required; enum: `investment`, `wants`, `need`)*
+  - `type` *(string, required; enum: `investment`, `wants`, `need`)*
   - `card_id` *(integer, required; references saved card)*
   - `description` *(string, optional)*
   - `date` *(ISO 8601 datetime, optional)*
 - **Response:** `201` with `{ "message": "Expense created successfully.", "data": { "expense": {...} } }`
   - `expense.category` is the stored slug; `expense.category_name` is the human-readable name.
+  - `expense.type` reflects the high-level classification (`wants`, `need`, `investment`).
   - `expense.card` contains the linked card object (including type-specific fields).
 
 ### List Expenses
@@ -34,11 +36,12 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
   - `page` *(int, default 1)*
   - `limit` *(int, default 10, max 100)*
   - `category` *(string, optional; enum: `investment`, `wants`, `need`)*
-  - `sort` *(string, one of: `date`, `amount`, `title`, `category`; default `date`)*
+  - `type` *(string, optional; enum: `investment`, `wants`, `need`)*
+  - `sort` *(string, one of: `date`, `amount`, `title`, `category`, `type`; default `date`)*
   - `order` *(string, `asc` or `desc`; default `desc`)*
 - **Response:** `200` with paginated items in `data.items`.
   - Each item includes both `category` (slug) and `category_name`.
-  - Each item includes the nested `card` object.
+  - Each item includes the `type` field and the nested `card` object.
 
 ### Retrieve Expense
 - **Method/Path:** `GET /api/expenses/<id>`
@@ -46,7 +49,7 @@ All endpoints require a Google OAuth token. In local testing use an `Authorizati
 
 ### Update Expense
 - **Method/Path:** `PUT/PATCH /api/expenses/<id>`
-- **Body:** Any subset of fields from creation payload.
+- **Body:** Any subset of fields from creation payload (type/category updates must use valid enums).
 - **Response:** `200` with updated `expense` or `404` when not found.
 
 ### Delete Expense

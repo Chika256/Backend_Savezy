@@ -167,6 +167,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Limit'
+        - name: type
+          in: query
+          description: Filter expenses by type.
+          schema:
+            type: string
+            enum: [investment, wants, need]
         - $ref: '#/components/parameters/CategoryFilter'
         - $ref: '#/components/parameters/SortField'
         - $ref: '#/components/parameters/SortOrder'
@@ -472,7 +478,7 @@ components:
       description: Field used for sorting.
       schema:
         type: string
-        enum: [date, amount, title, category, card]
+        enum: [date, amount, title, category, card, type]
         default: date
     SortOrder:
       name: order
@@ -595,6 +601,9 @@ components:
         amount:
           type: number
           format: float
+        type:
+          type: string
+          enum: [investment, wants, need]
         category:
           type: string
           description: Category slug (investment, wants, need).
@@ -703,6 +712,9 @@ components:
               type: object
               properties:
                 category:
+                  type: string
+                  nullable: true
+                type:
                   type: string
                   nullable: true
                 sort:
@@ -816,6 +828,7 @@ components:
         - title
         - amount
         - category
+        - type
         - card_id
       properties:
         title:
@@ -824,6 +837,9 @@ components:
           type: number
           format: float
         category:
+          type: string
+          enum: [investment, wants, need]
+        type:
           type: string
           enum: [investment, wants, need]
         description:
@@ -844,6 +860,9 @@ components:
           type: number
           format: float
         category:
+          type: string
+          enum: [investment, wants, need]
+        type:
           type: string
           enum: [investment, wants, need]
         description:
